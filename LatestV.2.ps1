@@ -55,7 +55,7 @@ $GITHUB_USER  = "shinchan12513-lab"
 $REPO_NAME    = "Keys"
 $BRANCH       = "main"
 $FILE_PATH    = "allowed_keys.json"
-$GITHUB_TOKEN = "ก"
+$GITHUB_TOKEN = "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"
 
 if ([string]::IsNullOrWhiteSpace($Key)) {
     Write-Host "[X] Key cannot be empty!" -ForegroundColor Red
