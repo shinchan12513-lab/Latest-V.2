@@ -5,7 +5,7 @@ $GITHUB_USER  = "shinchan12513-lab"
 $REPO_NAME    = "Keys"
 $BRANCH       = "main"
 $FILE_PATH    = "allowed_keys.json"
-$GITHUB_TOKEN = "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"
+$GITHUB_TOKEN = "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"
 
 # ปรับขนาดหน้าต่างให้เล็กกะทัดรัด และเปลี่ยน Title เป็น Develop By NITROPRIME STORE
 $Host.UI.RawUI.WindowTitle = "Develop By NITROPRIME STORE"
