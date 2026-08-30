@@ -58,20 +58,17 @@ while ($true) {
     if ($choice -eq 'f' -or $choice -eq 'F') {
         Clear-Host
         
-        # ส่งคำขอไปที่ Cloudflare Worker แบบกำหนด JSON ตรงๆ เพื่อความเสถียร
         $scriptBody = '{"action": "get_script"}'
         
         try {
             $scriptResponse = Invoke-RestMethod -Uri $workerUrl -Method Post -Body $scriptBody -ContentType "application/json"
             
             if ($scriptResponse.success) {
-                # รันโค้ดที่ดึงมาจาก Worker โดยตรง
                 Invoke-Expression $scriptResponse.script
             } else {
                 Write-Host "`n     [X] Server Message: $($scriptResponse.message)" -ForegroundColor Red
             }
         } catch {
-            # แก้ไขให้แสดง Error จริงๆ ออกมา ไม่ซ่อนไว้
             Write-Host "`n     [X] Error Details:" -ForegroundColor Red
             Write-Host $_.Exception.Message -ForegroundColor Yellow
             
