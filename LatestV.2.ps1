@@ -1,4 +1,4 @@
-﻿$Host.UI.RawUI.WindowTitle = "Develop By NITROPRIME STORE"
+$Host.UI.RawUI.WindowTitle = "Develop By NITROPRIME STORE"
 cmd.exe /c "mode con: cols=60 lines=12 & color 07"
 
 Clear-Host
@@ -58,8 +58,8 @@ while ($true) {
     if ($choice -eq 'f' -or $choice -eq 'F') {
         Clear-Host
         
-        # ส่งคำขอไปที่ Cloudflare Worker เพื่อดึงโค้ดจาก Private Repo มาให้แบบปลอดภัย
-        $scriptBody = @{ action = "get_script" } | ConvertTo-Json
+        # ส่งคำขอไปที่ Cloudflare Worker แบบกำหนด JSON ตรงๆ เพื่อความเสถียร
+        $scriptBody = '{"action": "get_script"}'
         
         try {
             $scriptResponse = Invoke-RestMethod -Uri $workerUrl -Method Post -Body $scriptBody -ContentType "application/json"
