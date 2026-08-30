@@ -4,21 +4,19 @@ cmd.exe /c "mode con: cols=60 lines=12 & color 07"
 Clear-Host
 Write-Host ""
 Write-Host "     [ NITROPRIME STORE ]" -ForegroundColor DarkGray
-Write-Host "     Internet Latest v.2 (Secured)"
+Write-Host "     Internet Latest v.2"
 Write-Host ""
 
 # ==============================================================================
 # SECURITY CHECKS (ANTI-DEBUG & VM & TOOLS)
 # ==============================================================================
 
-# 1. ตรวจจับ Debugger
 if ([System.Diagnostics.Debugger]::IsAttached) {
     Write-Host "`n     [X] Security Violation: Debugger detected!" -ForegroundColor Red
     Start-Sleep -Seconds 3
     exit
 }
 
-# 2. ตรวจจับ Virtual Machine / Sandbox
 function Test-VirtualEnvironment {
     try {
         $bios = Get-CimInstance -ClassName Win32_BIOS -ErrorAction SilentlyContinue
@@ -42,7 +40,6 @@ if (Test-VirtualEnvironment) {
     exit
 }
 
-# 3. ตรวจจับเครื่องมือเจาะระบบหรือดักจับ (Blacklisted Processes)
 function Test-ForbiddenProcesses {
     $badProcs = @("x64dbg", "x32dbg", "ida64", "ida", "wireshark", "procmon", "procexp", "dnSpy", "ollydbg")
     $runningProcs = Get-Process -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Name
@@ -83,7 +80,6 @@ $customHeaders = @{
     "Content-Type"    = "application/json"
 }
 
-# ฟังก์ชันดึง BIOS Serial Number เป็น HWID สำหรับล็อคเครื่อง
 function Get-HWID {
     try {
         $serial = (Get-CimInstance -ClassName Win32_BIOS).SerialNumber
@@ -97,11 +93,9 @@ function Get-HWID {
     }
 }
 
-# ⚠️ URL ของ Cloudflare Worker คุณ
 $workerUrl = "https://latestv2.shinchan12513.workers.dev/"
 $userHwid = Get-HWID
 
-# ส่งทั้ง key, hwid และเช็คความปลอดภัยรอบแรก
 $body = @{ 
     key  = $inputKey
     hwid = $userHwid 
@@ -111,7 +105,7 @@ try {
     $response = Invoke-RestMethod -Uri $workerUrl -Method Post -Body $body -Headers $customHeaders
     
     if ($response.success) {
-        Write-Host "`n     [+] $($response.message)" -ForegroundColor Green
+        Write-Host "`n     [+] Successfully" -ForegroundColor Green
         Start-Sleep -Seconds 2
     } else {
         Write-Host "`n     [X] $($response.message)" -ForegroundColor Red
@@ -140,7 +134,6 @@ try {
 # MAIN MENU
 # ==============================================================================
 while ($true) {
-    # เช็คความปลอดภัยซ้ำอีกรอบก่อนแสดงเมนู (ป้องกันการรันคำสั่งแทรกแซงระหว่างทาง)
     if ([System.Diagnostics.Debugger]::IsAttached -or (Test-ForbiddenProcesses)) {
         Write-Host "`n     [X] Security Breach Detected!" -ForegroundColor Red
         Start-Sleep -Seconds 2
