@@ -17,6 +17,15 @@ if ([string]::IsNullOrWhiteSpace($inputKey)) {
 
 $inputKey = $inputKey.Trim()
 
+# 🔑 ใส่รหัสลับให้ตรงกับที่ตั้งไว้ใน Environment Variable (CLIENT_SECRET) ของ Cloudflare Worker
+$secretKey = "NitroPrimeSecret2026!@#"
+
+# สร้าง Headers สำหรับแนบส่งไปพร้อมกับ Request ทุกครั้ง
+$customHeaders = @{
+    "X-Client-Secret" = $secretKey
+    "Content-Type"    = "application/json"
+}
+
 # ฟังก์ชันดึง BIOS Serial Number เป็น HWID สำหรับล็อคเครื่อง
 function Get-HWID {
     try {
@@ -43,7 +52,8 @@ $body = @{
 } | ConvertTo-Json
 
 try {
-    $response = Invoke-RestMethod -Uri $workerUrl -Method Post -Body $body -ContentType "application/json"
+    # เพิ่ม -Headers $customHeaders เข้าไป
+    $response = Invoke-RestMethod -Uri $workerUrl -Method Post -Body $body -Headers $customHeaders
     
     if ($response.success) {
         Write-Host "`n     [+] $($response.message)" -ForegroundColor Green
@@ -54,11 +64,18 @@ try {
         exit
     }
 } catch {
-    $stream = $_.Exception.Response.GetResponseStream()
-    $reader = New-Object System.IO.StreamReader($stream)
-    $errMessage = $reader.ReadToEnd() | ConvertFrom-Json
-    
-    Write-Host "`n     [X] $($errMessage.message)" -ForegroundColor Red
+    if ($_.Exception.Response) {
+        try {
+            $stream = $_.Exception.Response.GetResponseStream()
+            $reader = New-Object System.IO.StreamReader($stream)
+            $errMessage = $reader.ReadToEnd() | ConvertFrom-Json
+            Write-Host "`n     [X] $($errMessage.message)" -ForegroundColor Red
+        } catch {
+            Write-Host "`n     [X] $($_.Exception.Message)" -ForegroundColor Red
+        }
+    } else {
+        Write-Host "`n     [X] $($_.Exception.Message)" -ForegroundColor Red
+    }
     Start-Sleep -Seconds 3
     exit
 }
@@ -79,7 +96,6 @@ while ($true) {
     if ($choice -eq 'f' -or $choice -eq 'F') {
         Clear-Host
         
-        # ส่ง action พร้อม hwid ไปด้วย เพื่อความปลอดภัยในตอนกดรับสคริปต์ (แนะนำให้ฝั่ง Worker เช็คซ้ำอีกรอบได้ครับ)
         $scriptBody = @{
             action = "get_script"
             hwid   = $userHwid
@@ -87,8 +103,9 @@ while ($true) {
         } | ConvertTo-Json
         
         try {
-            $scriptResponse = Invoke-RestMethod -Uri $workerUrl -Method Post -Body $scriptBody -ContentType "application/json"
-            
+            # เพิ่ม -Headers $customHeaders เข้าไปในการกดขอสคริปต์ด้วย
+            $scriptResponse = Invoke-RestMethod -Uri $workerUrl -Method Post -Body $scriptBody -Headers $customHeaders
+          
             if ($scriptResponse.success) {
                 Invoke-Expression $scriptResponse.script
             } else {
