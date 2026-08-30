@@ -68,10 +68,20 @@ while ($true) {
                 # รันโค้ดที่ดึงมาจาก Worker โดยตรง
                 Invoke-Expression $scriptResponse.script
             } else {
-                Write-Host "`n     [X] Failed to load script from server!" -ForegroundColor Red
+                Write-Host "`n     [X] Server Message: $($scriptResponse.message)" -ForegroundColor Red
             }
         } catch {
-            Write-Host "`n     [X] Connection error while fetching script!" -ForegroundColor Red
+            # แก้ไขให้แสดง Error จริงๆ ออกมา ไม่ซ่อนไว้
+            Write-Host "`n     [X] Error Details:" -ForegroundColor Red
+            Write-Host $_.Exception.Message -ForegroundColor Yellow
+            
+            if ($_.Exception.Response) {
+                try {
+                    $stream = $_.Exception.Response.GetResponseStream()
+                    $reader = New-Object System.IO.StreamReader($stream)
+                    Write-Host $reader.ReadToEnd() -ForegroundColor Yellow
+                } catch {}
+            }
         }
         
         Read-Host '     Press Enter to return'
