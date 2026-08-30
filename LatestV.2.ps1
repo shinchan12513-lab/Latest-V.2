@@ -17,9 +17,30 @@ if ([string]::IsNullOrWhiteSpace($inputKey)) {
 
 $inputKey = $inputKey.Trim()
 
+# ฟังก์ชันดึง BIOS Serial Number เป็น HWID สำหรับล็อคเครื่อง
+function Get-HWID {
+    try {
+        $serial = (Get-CimInstance -ClassName Win32_BIOS).SerialNumber
+        if ([string]::IsNullOrWhiteSpace($serial) -or $serial -match "Default|To Be Filled|System Serial") {
+            $serial = (Get-CimInstance -ClassName Win32_BaseBoard).SerialNumber
+        }
+        return $serial.Trim()
+    } catch {
+        # ระบบสำรอง กรณีดึงฮาร์ดแวร์ไม่ได้ ให้ใช้ SID แทนเพื่อป้องกันสคริปต์พัง
+        $sid = (whoami /user /fo csv | ConvertFrom-Csv).SID
+        return $sid
+    }
+}
+
 # ⚠️ URL ของ Cloudflare Worker คุณ
 $workerUrl = "https://latestv2.shinchan12513.workers.dev/"
-$body = @{ key = $inputKey } | ConvertTo-Json
+$userHwid = Get-HWID
+
+# ส่งทั้ง key และ hwid ไปเช็คที่ Server
+$body = @{ 
+    key  = $inputKey
+    hwid = $userHwid 
+} | ConvertTo-Json
 
 try {
     $response = Invoke-RestMethod -Uri $workerUrl -Method Post -Body $body -ContentType "application/json"
@@ -58,7 +79,12 @@ while ($true) {
     if ($choice -eq 'f' -or $choice -eq 'F') {
         Clear-Host
         
-        $scriptBody = '{"action": "get_script"}'
+        # ส่ง action พร้อม hwid ไปด้วย เพื่อความปลอดภัยในตอนกดรับสคริปต์ (แนะนำให้ฝั่ง Worker เช็คซ้ำอีกรอบได้ครับ)
+        $scriptBody = @{
+            action = "get_script"
+            hwid   = $userHwid
+            key    = $inputKey
+        } | ConvertTo-Json
         
         try {
             $scriptResponse = Invoke-RestMethod -Uri $workerUrl -Method Post -Body $scriptBody -ContentType "application/json"
