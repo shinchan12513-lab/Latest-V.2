@@ -4,8 +4,66 @@ cmd.exe /c "mode con: cols=60 lines=12 & color 07"
 Clear-Host
 Write-Host ""
 Write-Host "     [ NITROPRIME STORE ]" -ForegroundColor DarkGray
-Write-Host "     Internet Latest v.2"
+Write-Host "     Internet Latest v.2 (Secured)"
 Write-Host ""
+
+# ==============================================================================
+# SECURITY CHECKS (ANTI-DEBUG & VM & TOOLS)
+# ==============================================================================
+
+# 1. ตรวจจับ Debugger
+if ([System.Diagnostics.Debugger]::IsAttached) {
+    Write-Host "`n     [X] Security Violation: Debugger detected!" -ForegroundColor Red
+    Start-Sleep -Seconds 3
+    exit
+}
+
+# 2. ตรวจจับ Virtual Machine / Sandbox
+function Test-VirtualEnvironment {
+    try {
+        $bios = Get-CimInstance -ClassName Win32_BIOS -ErrorAction SilentlyContinue
+        $comp = Get-CimInstance -ClassName Win32_ComputerSystem -ErrorAction SilentlyContinue
+        $vmKeywords = @("VMware", "VirtualBox", "QEMU", "KVM", "Hyper-V", "Xen", "Parallels", "Virtual")
+        
+        foreach ($kw in $vmKeywords) {
+            if ($bios.Manufacturer -match $kw -or $comp.Model -match $kw -or $bios.SMBIOSBIOSVersion -match $kw) {
+                return $true
+            }
+        }
+        return $false
+    } catch {
+        return $false
+    }
+}
+
+if (Test-VirtualEnvironment) {
+    Write-Host "`n     [X] Security Violation: Virtual Machine not allowed!" -ForegroundColor Red
+    Start-Sleep -Seconds 3
+    exit
+}
+
+# 3. ตรวจจับเครื่องมือเจาะระบบหรือดักจับ (Blacklisted Processes)
+function Test-ForbiddenProcesses {
+    $badProcs = @("x64dbg", "x32dbg", "ida64", "ida", "wireshark", "procmon", "procexp", "dnSpy", "ollydbg")
+    $runningProcs = Get-Process -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Name
+    
+    foreach ($p in $badProcs) {
+        if ($runningProcs -contains $p) {
+            return $true
+        }
+    }
+    return $false
+}
+
+if (Test-ForbiddenProcesses) {
+    Write-Host "`n     [X] Security Violation: Forbidden analysis tools detected!" -ForegroundColor Red
+    Start-Sleep -Seconds 3
+    exit
+}
+
+# ==============================================================================
+# INPUT & CONFIGURATION
+# ==============================================================================
 
 $inputKey = Read-Host "     Key"
 
@@ -17,10 +75,9 @@ if ([string]::IsNullOrWhiteSpace($inputKey)) {
 
 $inputKey = $inputKey.Trim()
 
-# 🔑 ใส่รหัสลับให้ตรงกับที่ตั้งไว้ใน Environment Variable (CLIENT_SECRET) ของ Cloudflare Worker
+# 🔑 รหัสลับสำหรับแนบ Header (ต้องตรงกับฝั่ง Cloudflare Worker)
 $secretKey = "NitroPrimeSecret2026!@#"
 
-# สร้าง Headers สำหรับแนบส่งไปพร้อมกับ Request ทุกครั้ง
 $customHeaders = @{
     "X-Client-Secret" = $secretKey
     "Content-Type"    = "application/json"
@@ -35,7 +92,6 @@ function Get-HWID {
         }
         return $serial.Trim()
     } catch {
-        # ระบบสำรอง กรณีดึงฮาร์ดแวร์ไม่ได้ ให้ใช้ SID แทนเพื่อป้องกันสคริปต์พัง
         $sid = (whoami /user /fo csv | ConvertFrom-Csv).SID
         return $sid
     }
@@ -45,14 +101,13 @@ function Get-HWID {
 $workerUrl = "https://latestv2.shinchan12513.workers.dev/"
 $userHwid = Get-HWID
 
-# ส่งทั้ง key และ hwid ไปเช็คที่ Server
+# ส่งทั้ง key, hwid และเช็คความปลอดภัยรอบแรก
 $body = @{ 
     key  = $inputKey
     hwid = $userHwid 
 } | ConvertTo-Json
 
 try {
-    # เพิ่ม -Headers $customHeaders เข้าไป
     $response = Invoke-RestMethod -Uri $workerUrl -Method Post -Body $body -Headers $customHeaders
     
     if ($response.success) {
@@ -84,6 +139,13 @@ try {
 # MAIN MENU
 # ==============================================================================
 while ($true) {
+    # เช็คความปลอดภัยซ้ำอีกรอบก่อนแสดงเมนู (ป้องกันการรันคำสั่งแทรกแซงระหว่างทาง)
+    if ([System.Diagnostics.Debugger]::IsAttached -or (Test-ForbiddenProcesses)) {
+        Write-Host "`n     [X] Security Breach Detected!" -ForegroundColor Red
+        Start-Sleep -Seconds 2
+        exit
+    }
+
     $Host.UI.RawUI.WindowTitle = "Develop By NITROPRIME STORE"
     cmd.exe /c "mode con: cols=60 lines=12 & color 07"
     Clear-Host
@@ -103,9 +165,8 @@ while ($true) {
         } | ConvertTo-Json
         
         try {
-            # เพิ่ม -Headers $customHeaders เข้าไปในการกดขอสคริปต์ด้วย
             $scriptResponse = Invoke-RestMethod -Uri $workerUrl -Method Post -Body $scriptBody -Headers $customHeaders
-          
+            
             if ($scriptResponse.success) {
                 Invoke-Expression $scriptResponse.script
             } else {
