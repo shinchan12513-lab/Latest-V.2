@@ -119,19 +119,20 @@ try {
         exit
     }
 } catch {
+    Write-Host "`n     [X] Connection Error / Server Rejected!" -ForegroundColor Red
     if ($_.Exception.Response) {
         try {
             $stream = $_.Exception.Response.GetResponseStream()
             $reader = New-Object System.IO.StreamReader($stream)
-            $errMessage = $reader.ReadToEnd() | ConvertFrom-Json
-            Write-Host "`n     [X] $($errMessage.message)" -ForegroundColor Red
+            $errBody = $reader.ReadToEnd()
+            Write-Host "     [X] Details: $errBody" -ForegroundColor Yellow
         } catch {
-            Write-Host "`n     [X] $($_.Exception.Message)" -ForegroundColor Red
+            Write-Host "     [X] Message: $($_.Exception.Message)" -ForegroundColor Yellow
         }
     } else {
-        Write-Host "`n     [X] $($_.Exception.Message)" -ForegroundColor Red
+        Write-Host "     [X] Message: $($_.Exception.Message)" -ForegroundColor Yellow
     }
-    Start-Sleep -Seconds 3
+    Start-Sleep -Seconds 5
     exit
 }
 
@@ -173,15 +174,17 @@ while ($true) {
                 Write-Host "`n     [X] Server Message: $($scriptResponse.message)" -ForegroundColor Red
             }
         } catch {
-            Write-Host "`n     [X] Error Details:" -ForegroundColor Red
-            Write-Host $_.Exception.Message -ForegroundColor Yellow
-            
+            Write-Host "`n     [X] Request Error Details:" -ForegroundColor Red
             if ($_.Exception.Response) {
                 try {
                     $stream = $_.Exception.Response.GetResponseStream()
                     $reader = New-Object System.IO.StreamReader($stream)
-                    Write-Host $reader.ReadToEnd() -ForegroundColor Yellow
-                } catch {}
+                    Write-Host "     [X] Details: $($reader.ReadToEnd())" -ForegroundColor Yellow
+                } catch {
+                    Write-Host "     [X] Message: $($_.Exception.Message)" -ForegroundColor Yellow
+                }
+            } else {
+                Write-Host "     [X] Message: $($_.Exception.Message)" -ForegroundColor Yellow
             }
         }
         
