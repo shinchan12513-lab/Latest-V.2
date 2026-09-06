@@ -73,7 +73,7 @@ if ([string]::IsNullOrWhiteSpace($inputKey)) {
 $inputKey = $inputKey.Trim()
 
 # 🔑 รหัสลับสำหรับแนบ Header (ต้องตรงกับฝั่ง Cloudflare Worker)
-$secretKey = "ADSAADWADADADAWDA!#!@#%^"
+$secretKey = "aaDADd313441DASdddddddd"
 
 $customHeaders = @{
     "X-Client-Secret" = $secretKey
