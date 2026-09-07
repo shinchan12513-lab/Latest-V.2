@@ -52,8 +52,8 @@ if (Test-ForbiddenProcesses) {
     exit
 }
 
-# ปรับ UI ตรงช่องใส่ Key ให้เหลือ : อันเดียว
-$inputKey = Read-Host "     [+] Key"
+Write-Host -NoNewline "     [+] Key: "
+$inputKey = Read-Host
 
 if ([string]::IsNullOrWhiteSpace($inputKey)) {
     Write-Host "`n     [X] Key cannot be empty!" -ForegroundColor Red
@@ -112,8 +112,8 @@ while ($true) {
     Write-Host "     [+] [F] Install Program"
     Write-Host ""
     
-    # ปรับ UI ตรงเมนูเลือกให้เหลือ : อันเดียว
-    $choice = Read-Host "     [+]"
+    Write-Host -NoNewline "     [+] "
+    $choice = Read-Host
     
     if ($choice -eq 'f' -or $choice -eq 'F') {
         Clear-Host
