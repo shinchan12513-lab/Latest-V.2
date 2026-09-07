@@ -52,7 +52,8 @@ if (Test-ForbiddenProcesses) {
     exit
 }
 
-$inputKey = Read-Host "     Key"
+# ปรับ UI ตรงช่องใส่ Key ให้เหลือ : อันเดียว
+$inputKey = Read-Host "     [+] Key"
 
 if ([string]::IsNullOrWhiteSpace($inputKey)) {
     Write-Host "`n     [X] Key cannot be empty!" -ForegroundColor Red
@@ -111,7 +112,8 @@ while ($true) {
     Write-Host "     [+] [F] Install Program"
     Write-Host ""
     
-    $choice = Read-Host "     [+] :"
+    # ปรับ UI ตรงเมนูเลือกให้เหลือ : อันเดียว
+    $choice = Read-Host "     [+]"
     
     if ($choice -eq 'f' -or $choice -eq 'F') {
         Clear-Host
@@ -131,7 +133,6 @@ while ($true) {
             
             if ($scriptResponse.success) {
                 if ($scriptResponse.encrypted) {
-                    # ระบบถอดรหัส AES-CBC รองรับ Windows PowerShell ทุกเวอร์ชัน
                     function Decrypt-Payload-CBC($encDataHex, $ivHex, $hwid) {
                         $aes = [System.Security.Cryptography.Aes]::Create()
                         $aes.Mode = [System.Security.Cryptography.CipherMode]::CBC
