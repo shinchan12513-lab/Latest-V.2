@@ -72,12 +72,9 @@ if ([string]::IsNullOrWhiteSpace($inputKey)) {
 
 $inputKey = $inputKey.Trim()
 
-# 🔑 รหัสลับสำหรับแนบ Header (ต้องตรงกับฝั่ง Cloudflare Worker)
-$secretKey = "aaDADd313441DASdddddddd"
-
+# ❌ ไม่ต้องใช้ $secretKey ฝั่ง Client อีกต่อไป ใช้ Content-Type พื้นฐานพอ
 $customHeaders = @{
-    "X-Client-Secret" = $secretKey
-    "Content-Type"    = "application/json"
+    "Content-Type" = "application/json"
 }
 
 function Get-HWID {
@@ -96,6 +93,7 @@ function Get-HWID {
 $workerUrl = "https://latestv2.shinchan12513.workers.dev/"
 $userHwid = Get-HWID
 
+# ตรวจสอบ Key และ HWID ครั้งแรกตอนเปิดโปรแกรม
 $body = @{ 
     key  = $inputKey
     hwid = $userHwid 
@@ -114,18 +112,6 @@ try {
     }
 } catch {
     Write-Host "`n     [X] Connection Error / Server Rejected!" -ForegroundColor Red
-    if ($_.Exception.Response) {
-        try {
-            $stream = $_.Exception.Response.GetResponseStream()
-            $reader = New-Object System.IO.StreamReader($stream)
-            $errBody = $reader.ReadToEnd()
-            Write-Host "     [X] Details: $errBody" -ForegroundColor Yellow
-        } catch {
-            Write-Host "     [X] Message: $($_.Exception.Message)" -ForegroundColor Yellow
-        }
-    } else {
-        Write-Host "     [X] Message: $($_.Exception.Message)" -ForegroundColor Yellow
-    }
     Start-Sleep -Seconds 5
     exit
 }
@@ -144,18 +130,16 @@ while ($true) {
     cmd.exe /c "mode con: cols=60 lines=15 & color 07"
     Clear-Host
     Write-Host ""
-    Write-Host "     [+] [F] Install Script"
-    Write-Host "     [+] [R] Rekey / Reset HWID"
-    Write-Host "     [+] [E] Exit"
+    Write-Host "     [+] [F] Install Program"
     Write-Host ""
     
-    $choice = Read-Host "     [+] Select option"
+    $choice = Read-Host "     [+] :"
     
     if ($choice -eq 'f' -or $choice -eq 'F') {
         Clear-Host
         
         try {
-            # ขั้นตอนที่ 1: ขอ Session Token ชั่วคราวก่อน
+            # ขั้นตอนที่ 1: ขอ Session Token ชั่วคราว (ใช้ Key และ HWID ยืนยันตัวตนแทน Secret Key)
             $tokenBody = @{
                 action = "get_token"
                 key    = $inputKey
@@ -172,7 +156,7 @@ while ($true) {
 
             $sessionToken = $tokenResponse.token
 
-            # ขั้นตอนที่ 2: ใช้ Token ที่ได้ขอสคริปต์ที่เข้ารหัสมา
+            # ขั้นตอนที่ 2: ใช้ Session Token ที่มีอายุสั้น (1-2 นาที) ไปขอสคริปต์ที่เข้ารหัส
             $scriptBody = @{
                 action = "get_script"
                 token  = $sessionToken
@@ -214,44 +198,8 @@ while ($true) {
             }
         } catch {
             Write-Host "`n     [X] Request Error Details:" -ForegroundColor Red
-            if ($_.Exception.Response) {
-                try {
-                    $stream = $_.Exception.Response.GetResponseStream()
-                    $reader = New-Object System.IO.StreamReader($stream)
-                    Write-Host "     [X] Details: $($reader.ReadToEnd())" -ForegroundColor Yellow
-                } catch {
-                    Write-Host "     [X] Message: $($_.Exception.Message)" -ForegroundColor Yellow
-                }
-            } else {
-                Write-Host "     [X] Message: $($_.Exception.Message)" -ForegroundColor Yellow
-            }
         }
         
         Read-Host '     Press Enter to return'
-    }
-    elseif ($choice -eq 'r' -or $choice -eq 'R') {
-        Clear-Host
-        Write-Host "`n     [~] Requesting Rekey / Reset..." -ForegroundColor Yellow
-        try {
-            $rekeyBody = @{
-                action = "rekey"
-                key    = $inputKey
-                hwid   = $userHwid
-            } | ConvertTo-Json
-
-            $rekeyResponse = Invoke-RestMethod -Uri $workerUrl -Method Post -Body $rekeyBody -Headers $customHeaders
-
-            if ($rekeyResponse.success) {
-                Write-Host "`n     [+] $($rekeyResponse.message)" -ForegroundColor Green
-            } else {
-                Write-Host "`n     [X] $($rekeyResponse.message)" -ForegroundColor Red
-            }
-        } catch {
-            Write-Host "`n     [X] Failed to execute rekey request." -ForegroundColor Red
-        }
-        Read-Host '     Press Enter to return'
-    }
-    elseif ($choice -eq 'e' -or $choice -eq 'E') {
-        exit
     }
 }
