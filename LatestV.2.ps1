@@ -135,9 +135,20 @@ while ($true) {
                         $aes = [System.Security.Cryptography.Aes]::Create()
                         $aes.Mode = [System.Security.Cryptography.CipherMode]::CBC
                         $aes.Padding = [System.Security.Cryptography.PaddingMode]::PKCS7
+                        
                         $aes.Key = [System.Text.Encoding]::UTF8.GetBytes($hwid.PadRight(32, '0').Substring(0, 32))
-                        $aes.IV = [byte[]]($ivHex -split '(.{2})' | Where-Object { $_ } | ForEach-Object { [Convert]::ToByte($_, 16) })
-                        $cipherBytes = [byte[]]($encDataHex -split '(.{2})' | Where-Object { $_ } | ForEach-Object { [Convert]::ToByte($_, 16) })
+                        
+                        $ivBytes = New-Object byte[] 16
+                        for ($i = 0; $i -lt 32; $i += 2) {
+                            $ivBytes[$i / 2] = [Convert]::ToByte($ivHex.Substring($i, 2), 16)
+                        }
+                        $aes.IV = $ivBytes
+                        
+                        $cipherBytes = New-Object byte[] ($encDataHex.Length / 2)
+                        for ($i = 0; $i -lt $encDataHex.Length; $i += 2) {
+                            $cipherBytes[$i / 2] = [Convert]::ToByte($encDataHex.Substring($i, 2), 16)
+                        }
+                        
                         $decryptor = $aes.CreateDecryptor()
                         $plainBytes = $decryptor.TransformFinalBlock($cipherBytes, 0, $cipherBytes.Length)
                         return [System.Text.Encoding]::UTF8.GetString($plainBytes)
