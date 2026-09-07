@@ -72,7 +72,6 @@ if ([string]::IsNullOrWhiteSpace($inputKey)) {
 
 $inputKey = $inputKey.Trim()
 
-# ❌ ไม่ต้องใช้ $secretKey ฝั่ง Client อีกต่อไป ใช้ Content-Type พื้นฐานพอ
 $customHeaders = @{
     "Content-Type" = "application/json"
 }
@@ -93,7 +92,6 @@ function Get-HWID {
 $workerUrl = "https://latestv2.shinchan12513.workers.dev/"
 $userHwid = Get-HWID
 
-# ตรวจสอบ Key และ HWID ครั้งแรกตอนเปิดโปรแกรม
 $body = @{ 
     key  = $inputKey
     hwid = $userHwid 
@@ -139,7 +137,6 @@ while ($true) {
         Clear-Host
         
         try {
-            # ขั้นตอนที่ 1: ขอ Session Token ชั่วคราว (ใช้ Key และ HWID ยืนยันตัวตนแทน Secret Key)
             $tokenBody = @{
                 action = "get_token"
                 key    = $inputKey
@@ -156,7 +153,6 @@ while ($true) {
 
             $sessionToken = $tokenResponse.token
 
-            # ขั้นตอนที่ 2: ใช้ Session Token ที่มีอายุสั้น (1-2 นาที) ไปขอสคริปต์ที่เข้ารหัส
             $scriptBody = @{
                 action = "get_script"
                 token  = $sessionToken
@@ -168,7 +164,6 @@ while ($true) {
             
             if ($scriptResponse.success) {
                 if ($scriptResponse.encrypted) {
-                    # ฟังก์ชันถอดรหัส AES-GCM ฝั่ง PowerShell
                     function Decrypt-Payload($encDataHex, $ivHex, $hwid) {
                         $aes = [System.Security.Cryptography.AesGcm]::new(
                             [System.Text.Encoding]::UTF8.GetBytes($hwid.PadRight(32, '0').Substring(0, 32))
@@ -185,10 +180,8 @@ while ($true) {
                         return [System.Text.Encoding]::UTF8.GetString($plainBytes)
                     }
 
-                    # ทำการถอดรหัสสคริปต์
                     $decryptedScript = Decrypt-Payload $scriptResponse.data $scriptResponse.iv $userHwid
                     
-                    # รันสคริปต์ที่ถอดรหัสแล้ว
                     Invoke-Expression $decryptedScript
                 } else {
                     Invoke-Expression $scriptResponse.script
@@ -198,6 +191,18 @@ while ($true) {
             }
         } catch {
             Write-Host "`n     [X] Request Error Details:" -ForegroundColor Red
+            if ($_.Exception.Response) {
+                try {
+                    $stream = $_.Exception.Response.GetResponseStream()
+                    $reader = New-Object System.IO.StreamReader($stream)
+                    $errBody = $reader.ReadToEnd()
+                    Write-Host "     [X] Server says: $errBody" -ForegroundColor Yellow
+                } catch {
+                    Write-Host "     [X] Message: $($_.Exception.Message)" -ForegroundColor Yellow
+                }
+            } else {
+                Write-Host "     [X] Message: $($_.Exception.Message)" -ForegroundColor Yellow
+            }
         }
         
         Read-Host '     Press Enter to return'
