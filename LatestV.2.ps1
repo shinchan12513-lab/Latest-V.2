@@ -1,5 +1,5 @@
 $Host.UI.RawUI.WindowTitle = "Develop By NITROPRIME STORE"
-cmd.exe /c "mode con: cols=60 lines=12 & color 07"
+cmd.exe /c "mode con: cols=60 lines=15 & color 07"
 
 Clear-Host
 Write-Host ""
@@ -141,13 +141,15 @@ while ($true) {
     }
 
     $Host.UI.RawUI.WindowTitle = "Develop By NITROPRIME STORE"
-    cmd.exe /c "mode con: cols=60 lines=12 & color 07"
+    cmd.exe /c "mode con: cols=60 lines=15 & color 07"
     Clear-Host
     Write-Host ""
-    Write-Host "     [+] : Install by F"
+    Write-Host "     [+] [F] Install Script"
+    Write-Host "     [+] [R] Rekey / Reset HWID"
+    Write-Host "     [+] [E] Exit"
     Write-Host ""
     
-    $choice = Read-Host "     [+] "
+    $choice = Read-Host "     [+] Select option"
     
     if ($choice -eq 'f' -or $choice -eq 'F') {
         Clear-Host
@@ -190,7 +192,6 @@ while ($true) {
                         $iv = [byte[]]($ivHex -split '(.{2})' | Where-Object { $_ } | ForEach-Object { [Convert]::ToByte($_, 16) })
                         $cipherBytes = [byte[]]($encDataHex -split '(.{2})' | Where-Object { $_ } | ForEach-Object { [Convert]::ToByte($_, 16) })
                         
-                        # กำหนดขนาด Tag (AES-GCM ปกติ Tag 16 ไบต์ท้ายสุด)
                         $tagSize = 16
                         $actualCipher = $cipherBytes[0 .. ($cipherBytes.Length - $tagSize - 1)]
                         $tag = $cipherBytes[($cipherBytes.Length - $tagSize) .. ($cipherBytes.Length - 1)]
@@ -206,7 +207,6 @@ while ($true) {
                     # รันสคริปต์ที่ถอดรหัสแล้ว
                     Invoke-Expression $decryptedScript
                 } else {
-                    # เผื่อกรณีไม่ได้เข้ารหัส
                     Invoke-Expression $scriptResponse.script
                 }
             } else {
@@ -228,5 +228,30 @@ while ($true) {
         }
         
         Read-Host '     Press Enter to return'
+    }
+    elseif ($choice -eq 'r' -or $choice -eq 'R') {
+        Clear-Host
+        Write-Host "`n     [~] Requesting Rekey / Reset..." -ForegroundColor Yellow
+        try {
+            $rekeyBody = @{
+                action = "rekey"
+                key    = $inputKey
+                hwid   = $userHwid
+            } | ConvertTo-Json
+
+            $rekeyResponse = Invoke-RestMethod -Uri $workerUrl -Method Post -Body $rekeyBody -Headers $customHeaders
+
+            if ($rekeyResponse.success) {
+                Write-Host "`n     [+] $($rekeyResponse.message)" -ForegroundColor Green
+            } else {
+                Write-Host "`n     [X] $($rekeyResponse.message)" -ForegroundColor Red
+            }
+        } catch {
+            Write-Host "`n     [X] Failed to execute rekey request." -ForegroundColor Red
+        }
+        Read-Host '     Press Enter to return'
+    }
+    elseif ($choice -eq 'e' -or $choice -eq 'E') {
+        exit
     }
 }
