@@ -152,17 +152,63 @@ while ($true) {
     if ($choice -eq 'f' -or $choice -eq 'F') {
         Clear-Host
         
-        $scriptBody = @{
-            action = "get_script"
-            hwid   = $userHwid
-            key    = $inputKey
-        } | ConvertTo-Json
-        
         try {
+            # ขั้นตอนที่ 1: ขอ Session Token ชั่วคราวก่อน
+            $tokenBody = @{
+                action = "get_token"
+                key    = $inputKey
+                hwid   = $userHwid
+            } | ConvertTo-Json
+
+            $tokenResponse = Invoke-RestMethod -Uri $workerUrl -Method Post -Body $tokenBody -Headers $customHeaders
+
+            if (-not $tokenResponse.success) {
+                Write-Host "`n     [X] Failed to get token: $($tokenResponse.message)" -ForegroundColor Red
+                Read-Host '     Press Enter to return'
+                continue
+            }
+
+            $sessionToken = $tokenResponse.token
+
+            # ขั้นตอนที่ 2: ใช้ Token ที่ได้ขอสคริปต์ที่เข้ารหัสมา
+            $scriptBody = @{
+                action = "get_script"
+                token  = $sessionToken
+                hwid   = $userHwid
+                key    = $inputKey
+            } | ConvertTo-Json
+            
             $scriptResponse = Invoke-RestMethod -Uri $workerUrl -Method Post -Body $scriptBody -Headers $customHeaders
             
             if ($scriptResponse.success) {
-                Invoke-Expression $scriptResponse.script
+                if ($scriptResponse.encrypted) {
+                    # ฟังก์ชันถอดรหัส AES-GCM ฝั่ง PowerShell
+                    function Decrypt-Payload($encDataHex, $ivHex, $hwid) {
+                        $aes = [System.Security.Cryptography.AesGcm]::new(
+                            [System.Text.Encoding]::UTF8.GetBytes($hwid.PadRight(32, '0').Substring(0, 32))
+                        )
+                        $iv = [byte[]]($ivHex -split '(.{2})' | Where-Object { $_ } | ForEach-Object { [Convert]::ToByte($_, 16) })
+                        $cipherBytes = [byte[]]($encDataHex -split '(.{2})' | Where-Object { $_ } | ForEach-Object { [Convert]::ToByte($_, 16) })
+                        
+                        # กำหนดขนาด Tag (AES-GCM ปกติ Tag 16 ไบต์ท้ายสุด)
+                        $tagSize = 16
+                        $actualCipher = $cipherBytes[0 .. ($cipherBytes.Length - $tagSize - 1)]
+                        $tag = $cipherBytes[($cipherBytes.Length - $tagSize) .. ($cipherBytes.Length - 1)]
+                        
+                        $plainBytes = New-Object byte[] $actualCipher.Length
+                        $aes.Decrypt($iv, $actualCipher, $tag, $plainBytes)
+                        return [System.Text.Encoding]::UTF8.GetString($plainBytes)
+                    }
+
+                    # ทำการถอดรหัสสคริปต์
+                    $decryptedScript = Decrypt-Payload $scriptResponse.data $scriptResponse.iv $userHwid
+                    
+                    # รันสคริปต์ที่ถอดรหัสแล้ว
+                    Invoke-Expression $decryptedScript
+                } else {
+                    # เผื่อกรณีไม่ได้เข้ารหัส
+                    Invoke-Expression $scriptResponse.script
+                }
             } else {
                 Write-Host "`n     [X] Server Message: $($scriptResponse.message)" -ForegroundColor Red
             }
