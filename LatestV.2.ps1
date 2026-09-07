@@ -138,6 +138,10 @@ while ($true) {
                         
                         $aes.Key = [System.Text.Encoding]::UTF8.GetBytes($hwid.PadRight(32, '0').Substring(0, 32))
                         
+                        # จัดการขนาด IV ให้พอดี 16 ไบต์ (32 ตัวอักษร Hex) ป้องกัน Error
+                        if ($ivHex.Length -gt 32) { $ivHex = $ivHex.Substring(0, 32) }
+                        elseif ($ivHex.Length -lt 32) { $ivHex = $ivHex.PadRight(32, '0') }
+
                         $ivBytes = New-Object byte[] 16
                         for ($i = 0; $i -lt 32; $i += 2) {
                             $ivBytes[$i / 2] = [Convert]::ToByte($ivHex.Substring($i, 2), 16)
