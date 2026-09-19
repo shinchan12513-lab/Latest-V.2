@@ -171,18 +171,10 @@ while ($true) {
             Write-Host "`n     [X] Request Error Details:" -ForegroundColor Red
             if ($_.Exception.Response) {
                 try {
-                    $statusCode = [int]$_.Exception.Response.StatusCode
-                    $statusDesc =$_.Exception.Response.StatusDescription
-                    Write-Host "     [X] HTTP Status: $statusCode$statusDesc" -ForegroundColor Yellow
-                    
                     $stream =$_.Exception.Response.GetResponseStream()
                     $reader = New-Object System.IO.StreamReader($stream)
                     $errBody =$reader.ReadToEnd()
-                    if (-not [string]::IsNullOrWhiteSpace($errBody)) {
-                        Write-Host "     [X] Server Response: $errBody" -ForegroundColor Yellow
-                    } else {
-                        Write-Host "     [X] Server Response: (Empty body / Worker threw 500 error)" -ForegroundColor Yellow
-                    }
+                    Write-Host "     [X] Server says: $errBody" -ForegroundColor Yellow
                 } catch {
                     Write-Host "     [X] Message: $($_.Exception.Message)" -ForegroundColor Yellow
                 }
