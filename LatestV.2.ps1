@@ -128,7 +128,7 @@ while ($true) {
 
             $sessionToken =$tokenResponse.token
             $scriptBody = @{ action = "get_script"; token = $sessionToken; hwid = $userHwid; key =$inputKey } | ConvertTo-Json
-            $scriptResponse = Invoke-RestMethod -Uri$workerUrl -Method Post -Body $scriptBody -Headers$customHeaders
+            $scriptResponse = Invoke-RestMethod -Uri $workerUrl -Method Post -Body $scriptBody -Headers$customHeaders
             
             if ($scriptResponse.success) {
                 if ($scriptResponse.encrypted) {
